@@ -1,12 +1,10 @@
 services:
   - type: web
     name: slack-ai-agent
-    runtime: node
-    plan: free
-    buildCommand: npm ci
+    env: node
+    plan: starter
+    buildCommand: npm install
     startCommand: npm start
-    # Required: set these in Render Dashboard (sync: false = secret, not in repo)
-    # SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SLACK_SIGNING_SECRET, SLACK_PRIVATE_CHANNEL_ID, OPENAI_API_KEY
     envVars:
       - key: NODE_ENV
         value: production
