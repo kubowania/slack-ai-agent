@@ -14,15 +14,15 @@ An intelligent Slack bot that automatically researches new community members and
 ## Architecture
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Slack API     │───▶│  Slack Service   │───▶│ Member Research │
-│ (New Members)   │    │  (Event Handler) │    │    Service      │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│    Slack API     │────▶│  Slack Service   │────▶│ Member Research  │
+│  (New Members)   │     │ (Event Handler)  │     │     Service      │
+└──────────────────┘     └──────────────────┘     └───────┬──────────┘
                                                           │
-┌─────────────────┐    ┌──────────────────┐             ▼
-│ Private Channel │◀───│  Analysis Report │    ┌─────────────────┐
-│  (Slack Bot)    │    │   Generator      │◀───│ OpenAI/Langchain│
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+┌──────────────────┐     ┌──────────────────┐     ┌───────▼──────────┐
+│ Private Channel  │◀────│ Analysis Report  │◀────│ OpenAI/Langchain │
+│   (Slack Bot)    │     │    Generator     │     │                  │
+└──────────────────┘     └──────────────────┘     └──────────────────┘
 ```
 
 ## Prerequisites
@@ -149,17 +149,19 @@ git push -u origin main
 ### 2. Deploy on Render
 
 1. Go to [Render.com](https://render.com)
-2. Click "New" → "Web Service"
-3. Connect your GitHub repository
+2. Click "New" → "Blueprint"
+3. Connect your GitHub repository (or use the Blueprint link: `https://dashboard.render.com/blueprint/new?repo=<your-repo-https-url>`)
 4. Render will automatically detect the `render.yaml` file
 5. Set your environment variables in the Render dashboard:
    - `SLACK_BOT_TOKEN`
-   - `SLACK_APP_TOKEN`  
+   - `SLACK_APP_TOKEN`
    - `SLACK_SIGNING_SECRET`
    - `SLACK_PRIVATE_CHANNEL_ID`
    - `OPENAI_API_KEY`
    - Update company information variables
 6. Deploy!
+
+**Why Render Blueprint?** Render detects your `render.yaml` and automatically creates the services and environment variables defined in it. You don’t add the service or env keys by hand because, the Blueprint creates them from the file. You only fill in the secret values (e.g. Slack and OpenAI keys) when prompted. Everything else (build command, start command, health check, plan) is applied from the file, so deployment is reproducible and easy to update by changing the file and pushing.
 
 ## Configuration
 
@@ -198,6 +200,8 @@ The agent researches new members using:
 GET /health
 ```
 Returns service health status.
+
+**Why it matters on Render:** The Blueprint sets `healthCheckPath: /health` in `render.yaml`, so Render calls this endpoint after each deploy. When it gets a 2xx (this handler returns 200 with `{ status: 'healthy', timestamp }`), Render marks the deploy live and sends traffic to it; otherwise it can retry or fail the deploy. That enables zero-downtime deploys and faster feedback when the app isn’t ready.
 
 ### Status Check
 ```
