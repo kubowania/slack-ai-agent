@@ -14,15 +14,15 @@ An intelligent Slack bot that automatically researches new community members and
 ## Architecture
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Slack API     │───▶│  Slack Service   │───▶│ Member Research │
-│ (New Members)   │    │  (Event Handler) │    │    Service      │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│    Slack API     │────▶│  Slack Service   │────▶│ Member Research  │
+│  (New Members)   │     │ (Event Handler)  │     │     Service      │
+└──────────────────┘     └──────────────────┘     └───────┬──────────┘
                                                           │
-┌─────────────────┐    ┌──────────────────┐             ▼
-│ Private Channel │◀───│  Analysis Report │    ┌─────────────────┐
-│  (Slack Bot)    │    │   Generator      │◀───│ OpenAI/Langchain│
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+┌──────────────────┐     ┌──────────────────┐     ┌───────▼──────────┐
+│ Private Channel  │◀────│ Analysis Report  │◀────│ OpenAI/Langchain │
+│   (Slack Bot)    │     │    Generator     │     │                  │
+└──────────────────┘     └──────────────────┘     └──────────────────┘
 ```
 
 ## Prerequisites
