@@ -7,6 +7,7 @@ An intelligent Slack bot that automatically researches new community members and
 - **Automatic Member Detection**: Monitors Slack for new member joins
 - **AI-Powered Research**: Researches members using multiple sources (GitHub, company websites, etc.)
 - **Intelligent Analysis**: Uses GPT-4 to analyze member fit for your product
+- **Render.com PostgreSQL Database**: Saves all analyses before posting to Slack for data persistence and audit trail
 - **Private Reporting**: Sends formatted analysis reports to a private Slack channel
 - **Comprehensive Logging**: Full logging and monitoring for production use
 - **Easy Deployment**: Ready-to-deploy on Render.com
@@ -14,15 +15,27 @@ An intelligent Slack bot that automatically researches new community members and
 ## Architecture
 
 ```
-┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│    Slack API     │────▶│  Slack Service   │────▶│ Member Research  │
-│  (New Members)   │     │ (Event Handler)  │     │     Service      │
-└──────────────────┘     └──────────────────┘     └───────┬──────────┘
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Slack API     │───▶│  Slack Service   │───▶│ Member Research │
+│ (New Members)   │    │  (Event Handler) │    │    Service      │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
                                                           │
-┌──────────────────┐     ┌──────────────────┐     ┌───────▼──────────┐
-│ Private Channel  │◀────│ Analysis Report  │◀────│ OpenAI/Langchain │
-│   (Slack Bot)    │     │    Generator     │     │                  │
-└──────────────────┘     └──────────────────┘     └──────────────────┘
+                                                          ▼
+                                                ┌─────────────────┐
+                                                │ OpenAI/Langchain│
+                                                └────────┬────────┘
+                                                         │
+                       ┌──────────────────┐              │
+                       │  Analysis Report │◀─────────────┘
+                       │   Generator      │
+                       └───────┬──────────┘
+                               │
+                    ┌──────────┴──────────┐
+                    ▼                     ▼
+          ┌─────────────────┐   ┌─────────────────┐
+          │   PostgreSQL    │   │ Private Channel │
+          │  (Render.com)   │   │  (Slack Bot)    │
+          └─────────────────┘   └─────────────────┘
 ```
 
 ## Prerequisites
@@ -30,7 +43,7 @@ An intelligent Slack bot that automatically researches new community members and
 - Node.js 18+ 
 - OpenAI API key
 - Slack workspace with admin access
-- Render.com account (for deployment)
+- Render.com account (for deployment and database)
 
 ## Quick Start
 
@@ -70,7 +83,22 @@ npm install
 7. Navigate to **Basic Information**:
    - Copy the **Signing Secret**
 
-### 3. Configure Environment
+### 3. Create a PostgreSQL Database on Render
+
+This project uses Render.com PostgreSQL as the database.
+
+1. Go to [Render.com](https://render.com)
+2. Click "New" → "PostgreSQL"
+3. Configure the database:
+   - **Name:** `slack-agent-db`
+   - **Database:** `slack_agent`
+   - **User:** choose a username
+   - **Region:** same region as your web service
+   - **Plan:** Free or Starter
+4. Click "Create Database"
+5. Once created, go to the **Info** section and copy the connection details
+
+### 4. Configure Environment
 
 ```bash
 cp .env.example .env
@@ -88,6 +116,13 @@ SLACK_PRIVATE_CHANNEL_ID=C1234567890  # Channel ID where reports are sent
 # OpenAI Configuration
 OPENAI_API_KEY=sk-your-openai-api-key-here
 
+# Database Configuration (from Render.com PostgreSQL)
+DB_HOST=your-render-db-hostname.oregon-postgres.render.com
+DB_PORT=5432
+DB_NAME=slack_agent
+DB_USER=your-render-db-user
+DB_PASSWORD=your-render-db-password
+
 # Company Information
 COMPANY_NAME=Your Company Name
 COMPANY_PRODUCT=Your Commercial Product Name
@@ -95,7 +130,7 @@ COMPANY_WEBSITE=https://yourcompany.com
 COMPANY_DESCRIPTION=Brief description of what your company does
 ```
 
-### 4. Find Your Private Channel ID
+### 5. Find Your Private Channel ID
 
 In Slack:
 1. Go to your private channel
@@ -103,7 +138,7 @@ In Slack:
 3. The URL will be like: `https://yourworkspace.slack.com/archives/C1234567890`
 4. The `C1234567890` part is your channel ID
 
-### 5. Run Locally
+### 6. Run Locally
 
 ```bash
 npm run dev
@@ -116,7 +151,7 @@ The agent will start and display:
 🎉 Slack AI Agent is fully operational!
 ```
 
-### 6. Test the Agent
+### 7. Test the Agent
 
 **Method 1: Add a test member to your Slack workspace**
 
@@ -146,22 +181,20 @@ git remote add origin <your-github-repo-url>
 git push -u origin main
 ```
 
-### 2. Deploy on Render
+### 2. Deploy the Web Service on Render
 
-1. Go to [Render.com](https://render.com)
-2. Click "New" → "Blueprint"
-3. Connect your GitHub repository (or use the Blueprint link: `https://dashboard.render.com/blueprint/new?repo=<your-repo-https-url>`)
-4. Render will automatically detect the `render.yaml` file
-5. Set your environment variables in the Render dashboard:
+1. Click "New" → "Web Service"
+2. Connect your GitHub repository
+3. Render will automatically detect the `render.yaml` file
+4. Set your environment variables in the Render dashboard:
    - `SLACK_BOT_TOKEN`
    - `SLACK_APP_TOKEN`
    - `SLACK_SIGNING_SECRET`
    - `SLACK_PRIVATE_CHANNEL_ID`
    - `OPENAI_API_KEY`
+   - `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` (from step 2)
    - Update company information variables
-6. Deploy!
-
-**Why Render Blueprint?** Render detects your `render.yaml` and automatically creates the services and environment variables defined in it. You don’t add the service or env keys by hand because, the Blueprint creates them from the file. You only fill in the secret values (e.g. Slack and OpenAI keys) when prompted. Everything else (build command, start command, health check, plan) is applied from the file, so deployment is reproducible and easy to update by changing the file and pushing.
+5. Deploy!
 
 ## Configuration
 
@@ -169,59 +202,24 @@ git push -u origin main
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `SLACK_BOT_TOKEN` | ✅ | Bot token from Slack app |
-| `SLACK_APP_TOKEN` | ✅ | App-level token for Socket Mode |
+| `SLACK_BOT_TOKEN` | ✅ | Bot token from Slack app (starts with `xoxb-`) |
+| `SLACK_APP_TOKEN` | ✅ | App-level token for Socket Mode (starts with `xapp-`) |
 | `SLACK_SIGNING_SECRET` | ✅ | Signing secret from Slack app |
-| `SLACK_PRIVATE_CHANNEL_ID` | ✅ | Channel ID for reports |
+| `SLACK_PRIVATE_CHANNEL_ID` | ✅ | Channel ID where reports are sent |
 | `OPENAI_API_KEY` | ✅ | OpenAI API key |
-| `COMPANY_NAME` | ❌ | Your company name |
-| `COMPANY_PRODUCT` | ❌ | Your product name |
+| `DB_HOST` | ✅ | Render.com PostgreSQL hostname |
+| `DB_PORT` | ✅ | Render.com PostgreSQL port (default `5432`) |
+| `DB_NAME` | ✅ | Render.com PostgreSQL database name |
+| `DB_USER` | ✅ | Render.com PostgreSQL username |
+| `DB_PASSWORD` | ✅ | Render.com PostgreSQL password |
+| `COMPANY_NAME` | ❌ | Your company name (used in AI analysis prompt) |
+| `COMPANY_PRODUCT` | ❌ | Your product name (used in AI analysis prompt) |
+| `COMPANY_WEBSITE` | ❌ | Your company website URL |
+| `COMPANY_DESCRIPTION` | ❌ | Brief description of your company |
+| `NODE_ENV` | ❌ | Set to `development` to enable debug logging and test endpoint |
+| `PORT` | ❌ | Express server port (default `3000`) |
 
-### Research Sources
 
-The agent researches new members using:
-
-- **Company websites** (from email domains)
-- **GitHub profiles** (public repositories and activity)
-- **LinkedIn profiles** (placeholder - requires API access)
-- **Twitter/X profiles** (placeholder - requires API access)
-- **General web search** (placeholder - requires search API)
-
-> **Note**: Some research sources are placeholder implementations. For production use, consider integrating:
-> - LinkedIn API (requires approval)
-> - Google Custom Search API
-> - Clearbit or FullContact APIs
-> - ZoomInfo or Apollo.io APIs
-
-## API Endpoints
-
-### Health Check
-```
-GET /health
-```
-Returns service health status.
-
-**Why it matters on Render? :** The Blueprint sets `healthCheckPath: /health` in `render.yaml`, so Render calls this endpoint after each deploy. When it gets a 2xx (this handler returns 200 with `{ status: 'healthy', timestamp }`), Render marks the deploy live and sends traffic to it; otherwise it can retry or fail the deploy. That enables zero-downtime deploys and faster feedback when the app isn’t ready.
-
-### Status Check
-```
-GET /status  
-```
-Returns detailed service status including Slack connection.
-
-### Test Analysis (Development Only)
-```
-POST /test/analyze-member
-Content-Type: application/json
-
-{
-  "memberInfo": {
-    "name": "John Doe",
-    "email": "john@example.com", 
-    "title": "Software Engineer"
-  }
-}
-```
 
 ## Analysis Output
 
@@ -252,90 +250,18 @@ Research Sources:
 • GitHub Profile: john-doe
 ```
 
-## Monitoring & Logging
-
-The agent includes comprehensive logging:
-
-- **Development**: Console output with colors
-- **Production**: File-based logging (`logs/` directory)
-- **Structured logs**: JSON format for easy parsing
-- **Error tracking**: Automatic error capture and reporting
-- **Performance metrics**: Request timing and analysis metrics
-
-## Security Considerations
-
-- ✅ Environment variables for all secrets
-- ✅ Input validation and sanitization  
-- ✅ Error handling without exposing internals
-- ✅ Rate limiting for AI API calls
-- ✅ Minimal permission scopes for Slack bot
-- ⚠️ Research respects privacy laws (GDPR, CCPA)
-- ⚠️ No storage of personal data beyond analysis
-
-## Troubleshooting
-
-### Common Issues
-
-**"Configuration validation failed"**
-- Check all required environment variables are set
-- Verify Slack tokens are correct format
-
-**"Slack bot not receiving events"**
-- Ensure Socket Mode is enabled in Slack app
-- Check Event Subscriptions are configured
-- Verify bot is added to relevant channels
-
-**"OpenAI API errors"**  
-- Verify API key is valid and has credits
-- Check for rate limiting (wait and retry)
-- Ensure model access (GPT-4 may require approval)
-
-**"No research results"**
-- Research failures are handled gracefully
-- Check network connectivity for external APIs
-- Some research sources are placeholders
-
-### Debugging
-
-Enable debug logging:
-```bash
-NODE_ENV=development npm start
-```
-
-View application logs:
-```bash
-tail -f logs/combined.log
-tail -f logs/error.log  
-```
-
 ## Development
 
 ### Project Structure
 
 ```
-src/
-├── config/          # Configuration management
-├── services/        # Core business logic
-│   ├── slackService.js       # Slack integration
-│   └── memberResearchService.js  # AI research & analysis
-└── utils/           # Utilities
-    ├── logger.js            # Logging configuration  
-    └── researchUtils.js     # Research helpers
+├── index.js         # Main application (SlackAIAgent class)
+├── db.js            # PostgreSQL database module
+├── .env.example     # Environment variable template
+├── Dockerfile       # Docker container config
+├── render.yaml      # Render.com deployment config
+└── package.json
 ```
-
-### Adding New Research Sources
-
-1. Extend `ResearchUtils` class in `src/utils/researchUtils.js`
-2. Add new search methods following existing patterns
-3. Update `MemberResearchService` to use new sources
-4. Test thoroughly and handle API failures gracefully
-
-### Customizing Analysis Prompts
-
-Edit prompts in `src/services/memberResearchService.js`:
-
-- `analysisPrompt`: Main analysis logic
-- `researchPrompt`: Research data processing
 
 ## Contributing
 
@@ -348,15 +274,4 @@ Edit prompts in `src/services/memberResearchService.js`:
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Support
-
-For support, please:
-1. Check the troubleshooting section
-2. Search existing GitHub issues
-3. Create a new issue with detailed information
-
----
-
-**⚠️ Important**: This agent processes personal information. Ensure compliance with applicable privacy laws and your organization's data policies.
 
