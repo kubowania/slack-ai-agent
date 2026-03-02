@@ -6,6 +6,7 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 import express from 'express';
 import dotenv from 'dotenv';
 import axios from 'axios';
+import { initDatabase, saveMemberAnalysis, markAsSentToSlack, closeDatabase } from './db.js';
 
 dotenv.config();
 
@@ -114,6 +115,7 @@ class SlackAIAgent {
   }
 
   async analyzeAndPostMember(memberInfo) {
+    let analysisId = null;
     try {
       log.info(`Processing member: ${memberInfo.name}`);
       
@@ -123,14 +125,27 @@ class SlackAIAgent {
       // AI analysis
       const analysis = await this.analyzeWithAI(memberInfo, researchData);
       
+      // Save to database BEFORE posting to Slack
+      log.info(`Saving analysis to database for ${memberInfo.name}`);
+      analysisId = await saveMemberAnalysis(memberInfo, analysis, researchData);
+      
       // Post to Slack
       await this.postAnalysisToChannel(memberInfo, analysis, researchData);
+      
+      // Mark as sent to Slack in database
+      if (analysisId) {
+        await markAsSentToSlack(analysisId);
+      }
       
       log.info(`Completed analysis for ${memberInfo.name}, score: ${analysis.fitScore}`);
       return analysis;
       
     } catch (error) {
       log.error(`Error processing ${memberInfo.name}:`, error.message);
+      // Analysis is saved in DB even if Slack posting fails
+      if (analysisId) {
+        log.info(`Analysis ${analysisId} saved to database but not sent to Slack due to error`);
+      }
       throw error;
     }
   }
@@ -329,6 +344,10 @@ Consider job title, company size, technical background, and budget authority.`
 
   async start() {
     try {
+      // Initialize database
+      log.info('🗄️  Initializing database...');
+      await initDatabase();
+      
       // Start Express server
       const port = process.env.PORT || 3000;
       this.server = this.app.listen(port, () => {
@@ -357,6 +376,7 @@ Consider job title, company size, technical background, and budget authority.`
       if (this.server) {
         await new Promise(resolve => this.server.close(resolve));
       }
+      await closeDatabase();
       log.info('Stopped successfully');
     } catch (error) {
       log.error('Shutdown error:', error.message);
