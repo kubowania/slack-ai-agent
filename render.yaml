@@ -23,7 +23,3 @@ services:
       - key: COMPANY_PRODUCT
         value: Your Commercial Product
     healthCheckPath: /health
-    disk:
-      name: logs
-      mountPath: /opt/render/project/src/logs
-      sizeGB: 1
