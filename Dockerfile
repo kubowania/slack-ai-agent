@@ -11,10 +11,7 @@ COPY package*.json ./
 RUN npm ci --only=production --legacy-peer-deps
 
 # Copy source code
-COPY src/ src/
-
-# Create logs directory
-RUN mkdir -p logs
+COPY index.js db.js ./
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
