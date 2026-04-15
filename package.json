@@ -1,7 +1,7 @@
 {
   "name": "slack-ai-agent",
   "version": "1.0.0",
-  "description": "Minimal AI agent that analyzes new Slack community members for product fit",
+  "description": "",
   "main": "index.js",
   "type": "module",
   "scripts": {
@@ -9,20 +9,16 @@
     "dev": "node --watch index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["slack", "ai", "openai", "langchain", "member-analysis"],
   "author": "",
-  "license": "MIT",
+  "license": "ISC",
   "dependencies": {
-    "@slack/bolt": "^4.6.0",
-    "@slack/web-api": "^7.0.2",
-    "@langchain/openai": "^1.2.5",
-    "@langchain/core": "^1.0.0",
-    "express": "^4.22.1",
-    "dotenv": "^17.2.4",
-    "axios": "^1.7.2",
-    "pg": "^8.13.1"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "@langchain/core": "^1.1.40",
+    "@langchain/openai": "^1.4.4",
+    "@slack/bolt": "^4.7.0",
+    "@slack/web-api": "^7.15.1",
+    "axios": "^1.15.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "pg": "^8.20.0"
   }
 }
