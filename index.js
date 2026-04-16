@@ -7,7 +7,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import axios from 'axios';
 
-import { initDatabase, saveMemberAnalysis, markAsSentToSlack, closeDatabase} from './db.js'
+import { initDatabase, saveMemberAnalysis, markAsSentToSlack, closeDatabase } from './db.js'
 
 dotenv.config();
 
@@ -40,7 +40,7 @@ class SlackAIAgent {
     setupSlackEvents() {
         this.slack.event('team_join', async ({ event }) => {
             try {
-                log.info(`New member joined: ${event.user.real_name || 
+                log.info(`New member joined: ${event.user.real_name ||
                     event.user.name}`)
                 const userInfo = await this.getUserInfo(event.user.id);
                 await this.analyzeAndPostMember(userInfo);
@@ -67,31 +67,31 @@ class SlackAIAgent {
         this.app.use(express.json());
 
         this.app.get('/health', (req, res) => {
-            res.json({ status: 'healthy', timestamp: new Date().toISOString()});
+            res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 
             if (process.env.NODE_ENV === 'development') {
                 this.app.post('/test/analyze-member', async (req, res) => {
                     try {
                         const { memberInfo } = req.body;
-                        if (!memberInfo) return res.status(400).json({ error: 'memberInfo is required'})
+                        if (!memberInfo) return res.status(400).json({ error: 'memberInfo is required' })
                         const analysis = await this.analyzeAndPostMember(memberInfo);
                         res.json({ success: true, analysis, timestamp: new Date().toISOString() });
                     } catch (error) {
                         log.error('Test analysis error:', error.message)
-                        res.status(500).json({ error: 'Analysis failed', message: error.message})
+                        res.status(500).json({ error: 'Analysis failed', message: error.message })
                     }
                 });
             }
 
             this.app.use((err, req, res, next) => {
                 log.error('Express error', err.message)
-                res.status(500).json({ error: 'Internal server error'})
+                res.status(500).json({ error: 'Internal server error' })
             })
         })
     }
 
     async getUserInfo(userId) {
-        const result = await this.webClient.users.info({ user: userId});
+        const result = await this.webClient.users.info({ user: userId });
         const user = result.user;
 
         return {
@@ -134,7 +134,7 @@ class SlackAIAgent {
     async doBasicResearch(memberInfo) {
         const results = [];
         try {
-                if (memberInfo.email && !this.isPersonalEmail(memberInfo.email)) {
+            if (memberInfo.email && !this.isPersonalEmail(memberInfo.email)) {
                 const domain = memberInfo.email.split('@')[1];
                 const companyInfo = await this.getCompanyInfo(domain);
                 if (companyInfo) results.push(companyInfo);
@@ -154,7 +154,7 @@ class SlackAIAgent {
         try {
             const response = await axios.get(`https://www.${domain}`, {
                 timeout: 5000,
-                headers: { 'User-Agent': 'Mozilla/5.0'}
+                headers: { 'User-Agent': 'Mozilla/5.0' }
             });
 
             const titleMatch = response.data.match(/<title>(.*?)<\/title>/i)
@@ -163,7 +163,7 @@ class SlackAIAgent {
             return {
                 url: `https:///www.${domain}`,
                 title: title,
-                content: `Company website for ${domain}`,
+                content: `Company websit6e for ${domain}`,
                 type: 'company'
             }
         } catch (error) {
@@ -176,7 +176,7 @@ class SlackAIAgent {
         try {
             const response = await axios.get(
                 `https://api.github.com/search/users?q=${encodeURIComponent(name)}`,
-                { timeout: 5000}
+                { timeout: 5000 }
             );
 
             if (response.data.items && response.data.items.length > 0) {
@@ -197,7 +197,7 @@ class SlackAIAgent {
 
     async analyzeWithAI(memberInfo, researchData) {
         const prompt = ChatPromptTemplate.fromTemplate(
-    `Analyze this new community member for fit with our commercial 
+            `Analyze this new community member for fit with our commercial 
     product.
 
     Company: ${process.env.COMPANY_NAME || 'Your Company'}
@@ -222,12 +222,12 @@ class SlackAIAgent {
 
 
         try {
-            const researchSummary = researchData.length > 0 
-            ? researchData.map(r => `${r.title}: ${r.content}`).join(`\\n`)
-            : 'Limited research data available'
+            const researchSummary = researchData.length > 0
+                ? researchData.map(r => `${r.title}: ${r.content}`).join(`\\n`)
+                : 'Limited research data available'
 
             const chain = prompt.pipe(this.openai);
-            const result = await chain.invoke({ 
+            const result = await chain.invoke({
                 name: memberInfo.name,
                 email: memberInfo.email || 'Not provided',
                 title: memberInfo.title || 'not provided',
@@ -236,13 +236,13 @@ class SlackAIAgent {
 
             const responseText = result.content || result;
 
-            const cleanedResponse = 
-            responseText.replace(/```json\\n?|\\n?```/g, '').trim()
+            const cleanedResponse =
+                responseText.replace(/```json\n?|\n?```/g, '').trim()
 
             const analysis = JSON.parse(cleanedResponse)
 
             return {
-                fitScore:Math.max(0, Math.min(100, analysis.fitScore || 50)),
+                fitScore: Math.max(0, Math.min(100, analysis.fitScore || 50)),
                 insights: Array.isArray(analysis.insights) ? analysis.insights : ['Analysis completed'],
                 recommendations: Array.isArray(analysis.recommendations) ? analysis.recommendations : ['Follow up recommended']
             }
@@ -259,20 +259,20 @@ class SlackAIAgent {
 
     async postAnalysisToChannel(member, analysis, researchData) {
         const color = analysis.fitScore >= 80 ? '#36a64f'
-        : analysis.fitScore >= 60 ? '#ffb84d'
-        : analysis.fitScore >= 40 ? '#ff9500' : '#ff4444';
+            : analysis.fitScore >= 60 ? '#ffb84d'
+                : analysis.fitScore >= 40 ? '#ff9500' : '#ff4444';
 
         const blocks = [
             {
                 type: 'header',
-                text: { type: 'plain_text', text: `🔍 New Member: ${member.name}`}
+                text: { type: 'plain_text', text: `🔍 New Member: ${member.name}` }
             },
             {
                 type: 'section',
                 fields: [
-                    { type: 'mrkdwn', text: `*Fit Score:* ${analysis.fitScore}/100`},
-                    { type: 'mrkdwn', text: `*Email:* ${member.email || 'Not provided'}`},
-                    { type: 'mrkdwn', text: `*Title:* ${member.title || 'Not provided'}`},
+                    { type: 'mrkdwn', text: `*Fit Score:* ${analysis.fitScore}/100` },
+                    { type: 'mrkdwn', text: `*Email:* ${member.email || 'Not provided'}` },
+                    { type: 'mrkdwn', text: `*Title:* ${member.title || 'Not provided'}` },
                 ]
             }
         ];
@@ -282,8 +282,8 @@ class SlackAIAgent {
                 type: 'section',
                 text: {
                     type: 'mrkdwn',
-                    text: `*Insights:*\\n${analysis.insights.map(i =>
-                        `• ${i}`).join('\\n')}`
+                    text: `*Insights:*\n${analysis.insights.map(i =>
+                        `• ${i}`).join('\n')}`
                 }
             })
         }
@@ -293,8 +293,8 @@ class SlackAIAgent {
                 type: 'section',
                 text: {
                     type: 'mrkdwn',
-                    text: `*Recommendations:*\\n${analysis.recommendations.map(i =>
-                        `• ${i}`).join('\\n')}`
+                    text:  `*Recommendations:*\n${analysis.recommendations.map(i =>
+                        `• ${i}`).join('\n')}`
                 }
             });
         }
@@ -311,8 +311,13 @@ class SlackAIAgent {
 
         await this.webClient.chat.postMessage({
             channel: process.env.SLACK_PRIVATE_CHANNEL_ID,
-            text: `New Member Analysis: ${member.name} (${analysis.fitScore}/100)`,
-            blocks
+            text: `New Mmeber Analysis: ${member.name} (${analysis.fitScore}/100)`,
+            attachments: [
+                {
+                    color: color,
+                    blocks: blocks
+                }
+            ]
         });
 
         log.info(`Analysis posted to channel for ${member.name}`)
@@ -327,7 +332,7 @@ class SlackAIAgent {
 
     async start() {
         try {
-            log.info('🗄️ Initializing database...')
+            log.info('🗄️ Initilazing database...')
             await initDatabase()
 
             const port = process.env.PORT || 3000;
